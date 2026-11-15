@@ -1,0 +1,52 @@
+TICKET TRACKER — SHARED HOSTING DEPLOY (subfolder, SQLite, docroot-only)
+====================================================================
+
+WHAT TO UPLOAD (into e.g. public_html/tickets/)
+  index.php
+  login.php
+  auth_config.php   (already has your username + password hash — unchanged)
+  tickets.db        (your current data; the app auto-creates it if missing)
+  .htaccess         (Apache/LiteSpeed: blocks tickets.db + auth_config.php)
+  web.config        (IIS fallback: ignored on Apache, harmless to include)
+
+  DO NOT UPLOAD: setup_password.php
+  It is now an inert stub. Delete it locally too if you like — the password
+  is already set, so the file serves no purpose anymore.
+
+  NOTE: FileZilla / cPanel File Manager hide dotfiles by default.
+  Enable "show hidden files" or .htaccess won't get uploaded.
+
+PERMISSIONS (cPanel File Manager > right-click > Change Permissions)
+  Folders (including the tickets/ folder itself): 755
+  Files (.php, .htaccess, web.config):             644
+  tickets.db:                                      644 (owner writable is enough
+  on most hosts since PHP runs as your user; if adds/deletes fail, try 664 —
+  never 777). The folder itself must stay writable so SQLite can use its
+  journal (-journal/-wal) files.
+
+REQUIREMENTS ON THE HOST
+  PHP 7.4+ (8.x fine) with pdo_sqlite enabled.
+  If index.php says "PDO SQLite driver is missing", enable pdo_sqlite /
+  sqlite3 in cPanel > Select PHP Version > Extensions.
+
+VERIFY AFTER UPLOAD (replace with your URL)
+  1. https://yourdomain.com/tickets/            -> dashboard loads, read-only
+  2. https://yourdomain.com/tickets/tickets.db  -> must be 403 Forbidden
+  3. https://yourdomain.com/tickets/auth_config.php -> must be 403 (or blank)
+  4. Log in via "Log in to edit", add + rename + delete a test ticket, log out.
+
+NOTES
+  - No path config: everything uses __DIR__ and relative links, so the same
+    files work at domain root or in any subfolder.
+  - Errors are hidden from visitors (display_errors off); check cPanel >
+    Errors / error_log if something breaks.
+  - Back up tickets.db before each re-upload — uploading your local copy
+    overwrites the server's tickets.
+
+TROUBLESHOOTING
+  500 error ......... host runs old Apache without mod_headers/mod_authz_core
+                      guards: the .htaccess uses <IfModule>, so usually it is
+                      the PHP version — set PHP 8.x in cPanel.
+  Can't add/delete .. folder or tickets.db not writable — fix permissions above.
+  Logged out loop .. stale session: clear cookies for the domain, retry.
+  Old host (IIS) .... web.config does the same blocking as .htaccess.

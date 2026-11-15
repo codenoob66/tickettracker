@@ -1,0 +1,58 @@
+# Ticket Tracker — shared-hosting hardening (Apache / LiteSpeed / cPanel)
+# This folder is deployed as-is (domain root OR subfolder, e.g. example.com/tickets/).
+# Everything uses __DIR__ so no path config is needed.
+
+# 1. No directory listing
+Options -Indexes
+
+# 2. Block direct web access to the database + journal files.
+#    The app still reads tickets.db via PHP — this only blocks browsers.
+<FilesMatch "^tickets\.db(\-journal|\-wal|\-shm)?$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# 3. Block any other sqlite/db files, just in case
+<FilesMatch "\.(db|db3|sqlite|sqlite3|db\-journal|db\-wal|db\-shm)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# 4. Block the auth config and the (to-be-deleted) setup script
+<FilesMatch "^(auth_config\.php|setup_password\.php)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# 5. Small security headers (ignored if mod_headers is off)
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "same-origin"
+    Header always set X-Frame-Options "SAMEORIGIN"
+</IfModule>
+
+# 6. Protect this file itself
+<Files ".htaccess">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</Files>
