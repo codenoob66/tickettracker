@@ -28,8 +28,9 @@ Options -Indexes
     </IfModule>
 </FilesMatch>
 
-# 4. Block the auth config and the (to-be-deleted) setup script
-<FilesMatch "^(auth_config\.php|setup_password\.php)$">
+# 4. Block the auth config, the setup script (deleted, but belt-and-braces),
+#    and helper files with no business being served
+<FilesMatch "^(auth_config\.php|setup_password\.php|web\.config|\.gitignore|DEPLOY\.txt)$">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>
@@ -56,3 +57,10 @@ Options -Indexes
         Deny from all
     </IfModule>
 </Files>
+
+# 7. Block .git metadata (history still contains old secrets + old DB copies).
+#    Only the file manager / SSH should ever see this directory.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^\.git/ - [F,L]
+</IfModule>
