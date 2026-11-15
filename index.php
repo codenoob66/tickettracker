@@ -15,6 +15,7 @@ if (function_exists('header')) {
 }
 session_start();
 require_once __DIR__ . '/auth_config.php';
+date_default_timezone_set('Asia/Manila'); // display + new timestamps in Philippine time
 
 // CSRF token (per session, validated on every POST)
 if (empty($_SESSION['csrf']) || !is_string($_SESSION['csrf'])) {
@@ -67,11 +68,16 @@ function db() {
         description TEXT DEFAULT '',
         created_at TEXT NOT NULL
     )");
+    // Migration for DBs created before created_at existed
+    $cols = $pdo->query("PRAGMA table_info(tickets)")->fetchAll(PDO::FETCH_COLUMN, 1);
+    if (!in_array('created_at', $cols, true)) {
+        $pdo->exec("ALTER TABLE tickets ADD COLUMN created_at TEXT NOT NULL DEFAULT ''");
+    }
     return $pdo;
 }
 
 function loadTickets() {
-    return db()->query("SELECT id, type FROM tickets ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+    return db()->query("SELECT id, type, created_at FROM tickets ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
 }
 function e($s) { return htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8'); }
 
@@ -111,7 +117,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         }
         $stmt = $pdo->prepare("INSERT INTO tickets (id,type,subject,requester,status,created_at) VALUES (?,?,?,?,?,?)");
         try {
-            $stmt->execute([$newId, $type, '', '', 'New', date('Y-m-d H:i:s')]);
+            $stmt->execute([$newId, $type, '', '', 'New', gmdate('Y-m-d H:i:s')]);
         } catch (PDOException $ex) {
             header('Location: index.php?err=' . urlencode('Could not add ticket (duplicate number?).'));
             exit;
@@ -147,16 +153,33 @@ $emails = array_values(array_filter($tickets, fn($t) => ($t['type'] ?? '') === '
 
 function ticketRow($t, $editable) {
     $id = $t['id'];
+    $raw = $t['created_at'] ?? '';
+    if ($raw !== '') {
+        try {
+            // Stored values are UTC; display in Philippine time.
+            $dt = new DateTime($raw, new DateTimeZone('UTC'));
+            $dt->setTimezone(new DateTimeZone('Asia/Manila'));
+            $ts = $dt->format('M j, g:i A');
+            $full = $dt->format('Y-m-d H:i:s') . ' PHT';
+        } catch (Exception $ex) {
+            $ts = $raw;
+            $full = $raw;
+        }
+    } else {
+        $ts = '—';
+        $full = '';
+    }
     ob_start(); ?>
     <tr>
         <?php if ($editable): ?>
         <td>
-            <form method="post" style="display:inline">
+            <form method="post" style="display:inline-block; white-space:nowrap">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="update">
                 <input type="hidden" name="id" value="<?= e($id) ?>">
-                <input name="new_id" required maxlength="20" value="<?= e($id) ?>" size="10">
+                <input name="new_id" required maxlength="20" value="<?= e($id) ?>" size="8">
                 <button type="submit">Save</button>
+                <span class="ts" title="<?= e($full) ?>"><?= e($ts) ?></span>
             </form>
         </td>
         <td>
@@ -168,7 +191,7 @@ function ticketRow($t, $editable) {
             </form>
         </td>
         <?php else: ?>
-        <td><?= e($id) ?></td>
+        <td><?= e($id) ?> <span class="ts"><?= e($ts) ?></span></td>
         <?php endif; ?>
     </tr>
     <?php return ob_get_clean();
@@ -183,15 +206,16 @@ function ticketRow($t, $editable) {
 <style>
 body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
 .cols { display: flex; gap: 2rem; flex-wrap: wrap; }
-.col { flex: 1; min-width: 280px; }
+.col { flex: 1; min-width: 280px; overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; margin-top: .5rem; }
-th, td { border: 1px solid #ccc; padding: .5rem; text-align: left; }
+th, td { border: 1px solid #ccc; padding: .5rem; text-align: left; vertical-align: middle; }
 th { background: #f0f0f0; }
 input, button { padding: .4rem .6rem; }
 .error { color: #b00; }
 .authbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; }
 .authbar .who { color: #555; font-size: .9rem; }
 .readonly { color: #555; font-size: .9rem; background: #f7f7f7; border: 1px solid #ddd; padding: .4rem .6rem; }
+.ts { font-size: .8rem; color: #666; margin-left: .4rem; white-space: nowrap; }
 </style>
 </head>
 <body>
