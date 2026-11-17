@@ -77,7 +77,7 @@ function db() {
 }
 
 function loadTickets() {
-    return db()->query("SELECT id, type, created_at FROM tickets ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+    return db()->query("SELECT id, type, created_at FROM tickets ORDER BY created_at DESC, rowid DESC")->fetchAll(PDO::FETCH_ASSOC);
 }
 function e($s) { return htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8'); }
 
@@ -236,7 +236,7 @@ body {
 .btn-save:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
 .btn-delete { background: #fff; border: 1px solid #d9a40f; color: var(--gold-dark); }
 .btn-delete:hover { background: var(--gold-dark); border-color: var(--gold-dark); color: #fff; }
-.ticket-id-input { max-width: 130px; }
+.ticket-id-input { max-width: 100px; }
 .ts-badge { background: var(--gold-light); color: #5c430a; font-weight: 500; font-size: .78rem; white-space: nowrap; }
 .readonly { color: #5c430a; font-size: .9rem; background: #fff3d4; border: 1px solid var(--gold); border-radius: .5rem; padding: .5rem .75rem; }
 .error { color: #b00; }
